@@ -1,10 +1,13 @@
-
 import { NextResponse } from "next/server";
-import { getSettings, writeSettings } from "@/lib/settings";
 
 export async function GET() {
   try {
-    const settings = await getSettings();
+    const settings = {
+      autoApprove: false,
+      displayMode: "grid",
+      photosPerPage: 20,
+      showCaptions: true,
+    };
     return NextResponse.json(settings);
   } catch (error) {
     console.error(error);
@@ -18,7 +21,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const newSettings = await request.json();
-    await writeSettings(newSettings);
+    // await writeSettings(newSettings);
     return NextResponse.json({ success: true, settings: newSettings });
   } catch (error) {
     console.error(error);

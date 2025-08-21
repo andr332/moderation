@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, Settings, Image } from "lucide-react";
+import { Home, Image } from "lucide-react";
 import Link from "next/link";
 import {
   Sidebar,
@@ -24,7 +24,7 @@ const items = [
     title: "Streams",
     url: "/streams",
     icon: Image,
-  }
+  },
 ];
 
 export function AppSidebar() {

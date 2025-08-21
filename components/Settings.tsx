@@ -3,13 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Switch } from "./ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
 
 const Settings = () => {
   const [settings, setSettings] = useState({

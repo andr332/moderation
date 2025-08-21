@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,45 +26,36 @@ import {
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
-// --- Fake Data ---
-const campaigns = [
-  { id: "cmp_001", name: "Summer Sale" },
-  { id: "cmp_002", name: "Winter Deals" },
-  { id: "cmp_003", name: "Holiday Specials" },
-];
+interface Campaign {
+  id: string;
+  name: string;
+  description?: string;
+}
 
 interface Stream {
   id: string;
   name: string;
-  campaigns: string[];
+  campaigns: Campaign[];
   logoUrl?: string;
+  isActive: boolean;
+  displaySettings: {
+    mode: "grid" | "slideshow";
+    autoPlay: boolean;
+    slideInterval: number;
+    showMetadata: boolean;
+    theme: {
+      primaryColor: string;
+      backgroundColor: string;
+    };
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
-// Initial fake streams
-const initialStreams: Stream[] = [
-  {
-    id: "str_101",
-    name: "Summer Campaign Gallery",
-    campaigns: ["cmp_001"],
-    logoUrl: "https://picsum.photos/id/23/2500/1667",
-  },
-  {
-    id: "str_102",
-    name: "Winter Promo Wall",
-    campaigns: ["cmp_002"],
-    logoUrl: "https://picsum.photos/id/33/2500/1667",
-  },
-  {
-    id: "str_103",
-    name: "Holiday Customer Stories",
-    campaigns: ["cmp_003"],
-    logoUrl: "https://picsum.photos/id/11/2500/1667",
-  },
-];
-
-// --- Main Component ---
 const Streams = () => {
-  const [streams, setStreams] = useState<Stream[]>(initialStreams);
+  const [streams, setStreams] = useState<Stream[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
@@ -80,27 +71,91 @@ const Streams = () => {
 
   const router = useRouter();
 
+  // Fetch data from MongoDB
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [streamsResponse, campaignsResponse] = await Promise.all([
+        fetch("/api/streams"),
+        fetch("/api/campaigns"),
+      ]);
+
+      if (streamsResponse.ok && campaignsResponse.ok) {
+        const streamsData = await streamsResponse.json();
+        const campaignsData = await campaignsResponse.json();
+
+        if (streamsData.success && campaignsData.success) {
+          setStreams(streamsData.data);
+          setCampaigns(campaignsData.data);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast.error("Failed to load data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   // Create new stream
-  const handleCreateStream = () => {
+  const handleCreateStream = async () => {
     if (!newName.trim()) {
       toast.error("Please enter a stream name");
       return;
     }
 
-    const newStreamId = `str_${Date.now()}`;
-    const newStream: Stream = {
-      id: newStreamId,
-      name: newName.trim(),
-      campaigns: [...selectedCampaigns],
-      logoUrl: logoFile ? URL.createObjectURL(logoFile) : undefined,
-    };
+    try {
+      const response = await fetch("/api/streams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newName.trim(),
+          campaignIds: selectedCampaigns,
+          logoUrl: logoFile ? URL.createObjectURL(logoFile) : undefined,
+          displaySettings: {
+            mode: "grid",
+            autoPlay: false,
+            slideInterval: 5,
+            showMetadata: true,
+            theme: {
+              primaryColor: "#3B82F6",
+              backgroundColor: "#F8FAFC",
+            },
+          },
+        }),
+      });
 
-    setStreams((prev) => [...prev, newStream]);
-    setNewName("");
-    setSelectedCampaigns([]);
-    setLogoFile(null);
-    setQrStream(newStream);
-    setIsOpen(false);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          toast.success("Stream created successfully!");
+          setNewName("");
+          setSelectedCampaigns([]);
+          setLogoFile(null);
+          setIsOpen(false);
+          fetchData(); // Refresh the list
+        }
+      } else {
+        toast.error("Failed to create stream");
+      }
+    } catch (error) {
+      console.error("Error creating stream:", error);
+      toast.error("Error creating stream");
+    }
+  };
+
+  const handleEditStream = (streamId: string) => {
+    const streamToEdit = streams.find((s) => s.id === streamId);
+    if (streamToEdit) {
+      setNewName(streamToEdit.name);
+      setSelectedCampaigns(streamToEdit.campaigns.map((c) => c.id));
+      setLogoFile(null);
+      setIsOpen(true);
+    }
   };
 
   const toggleCampaign = (id: string) => {
@@ -152,6 +207,21 @@ const Streams = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-full shadow-lg">
+            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          <p className="text-lg font-medium text-slate-600">
+            Loading streams...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
@@ -170,16 +240,25 @@ const Streams = () => {
               onClick={() => router.push(`/streams/${stream.id}`)}
               className="cursor-pointer hover:shadow-md transition-shadow"
             >
-              <CardHeader>
+              <CardHeader className="flex items-center justify-between">
                 <CardTitle>{stream.name}</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditStream(stream.id);
+                  }}
+                >
+                  Edit
+                </Button>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-2">
                   Campaigns:{" "}
                   {stream.campaigns.length > 0
-                    ? stream.campaigns
-                        .map((id) => campaigns.find((c) => c.id === id)?.name)
-                        .join(", ")
+                    ? stream.campaigns.map((c) => c.name).join(", ")
                     : "None"}
                 </p>
                 {stream.logoUrl && (
@@ -215,7 +294,7 @@ const Streams = () => {
                     }}
                   >
                     <Copy className="w-4 h-4 mr-2" />
-                    Copy Script
+                    Copy Script or Public Url
                   </Button>
                 </div>
               </CardContent>
@@ -296,7 +375,7 @@ const Streams = () => {
           {qrStream && (
             <div className="flex flex-col items-center space-y-4 py-4">
               <QRCode
-                value={`https://yourapp.com/stream/${qrStream.id}`}
+                value={`http://localhost:3001/widget?streamId=${qrStream.id}`}
                 size={200}
               />
               <p className="text-sm text-muted-foreground">
@@ -308,17 +387,18 @@ const Streams = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Config Dialog for Embed Script */}
+      {/* Config Dialog for Embed Script / Public URL */}
       <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Generate Embed Script</DialogTitle>
+            <DialogTitle>Generate Embed Script or Public URL</DialogTitle>
             <DialogDescription>
               Select display mode and color for this stream.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {/* Display Mode Selector */}
             <RadioGroup
               value={displayMode}
               onValueChange={(val) =>
@@ -336,6 +416,7 @@ const Streams = () => {
               </div>
             </RadioGroup>
 
+            {/* Color Picker */}
             <div>
               <Label>Pick Color</Label>
               <Input
@@ -346,16 +427,40 @@ const Streams = () => {
               />
             </div>
 
-            <Button onClick={handleGenerateScript}>Generate Script</Button>
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <Button onClick={handleGenerateScript} className="flex-1">
+                Generate Script
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  if (selectedStream) {
+                    const url = `http://localhost:3001/widget?displayMode=${displayMode}&color=${encodeURIComponent(
+                      selectedColor
+                    )}&streamId=${selectedStream.id}`;
+                    setGeneratedScript(url);
+                  }
+                }}
+              >
+                Generate Public URL
+              </Button>
+            </div>
 
+            {/* Output Section */}
             {generatedScript && (
               <div className="space-y-2">
-                <Label htmlFor="embed-code">Embed Code</Label>
+                <Label htmlFor="embed-code">
+                  {generatedScript.startsWith("<")
+                    ? "Embed Code"
+                    : "Public URL"}
+                </Label>
                 <Textarea
                   id="embed-code"
                   value={generatedScript}
                   readOnly
-                  rows={6}
+                  rows={generatedScript.startsWith("<") ? 6 : 2}
                   className="font-mono text-xs"
                 />
                 <Button

@@ -3,48 +3,49 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "./ui/label";
+import { toast } from "sonner";
 
-interface Image {
+interface ImageData {
   id: string;
-  streamId?: string | null;
   img: string;
   name: string;
+  description?: string;
   date: string;
   approved: boolean;
+  status: "pending" | "approved" | "rejected";
+  campaignId: string;
+  campaignName: string;
+  streamId?: string;
+  streamName?: string;
+  source: "internal" | "external_app" | "manual";
 }
 
-export default function ModerationQueue() {
-  const [data, setData] = useState<Image[]>([]);
+export default function ModeratorView() {
+  const [data, setData] = useState<ImageData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [filter, setFilter] = useState("all");
-  const [streamFilter, setStreamFilter] = useState("all");
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/images");
-      const images = await response.json();
-      setData(images);
+      const response = await fetch("/api/images?status=pending");
+      console.log("Fetching pending images:", response);
+      // if (!response.ok) {
+      //   throw new Error("Failed to fetch images");
+      // }
+      const result = await response.json();
+      console.log("Fetched pending images:", result);
+
+      if (result.success) {
+        setData(result.data);
+        setCurrentIndex(0);
+      } else {
+        console.error("API Error:", result.error);
+        setData([]);
+      }
     } catch (error) {
       console.error("Error fetching images:", error);
+      setData([]);
     } finally {
       setLoading(false);
     }
@@ -54,232 +55,120 @@ export default function ModerationQueue() {
     fetchData();
   }, []);
 
-  const handleModerate = async (ids: string[], approved: boolean) => {
+  const handleModerate = async (approved: boolean) => {
+    const currentImage = data[currentIndex];
+    if (!currentImage) return;
+
     try {
-      await Promise.all(
-        ids.map((id) =>
-          fetch("/api/images/moderate", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ id, approved }),
-          })
-        )
-      );
-      fetchData(); // Refresh the data after moderation
-      setSelected([]);
+      const response = await fetch("/api/images/moderate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: currentImage.id, approved }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to moderate image");
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        // Move to next image
+        setCurrentIndex((prev) => prev + 1);
+        toast.success(approved ? "Image approved!" : "Image rejected!");
+      } else {
+        console.error("Moderation failed:", result.error);
+        toast.error("Failed to moderate image");
+      }
     } catch (error) {
-      console.error("Error moderating images:", error);
+      console.error("Error moderating image:", error);
+      toast.error("Error moderating image");
     }
   };
-
-  const handleSelect = (id: string) => {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selected.length === filteredData.length) {
-      setSelected([]);
-    } else {
-      setSelected(filteredData.map((item) => item.id));
-    }
-  };
-
-  const filteredData = data?.filter((item) => {
-    if (filter === "all") return true;
-    if (filter === "approved") return item.approved;
-    if (filter === "pending") return !item.approved;
-    return true;
-  });
-
-  const streamFilteredData = () =>
-    data?.filter((item) => {
-      if (streamFilter === "all") return true;
-      if (streamFilter === "assigned") return item.streamId !== null;
-      if (streamFilter === "unassigned") return item.streamId === null;
-      return true;
-    });
 
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        Loading...
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-full shadow-lg">
+            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          <p className="text-lg font-medium text-slate-600">
+            Loading images...
+          </p>
+        </div>
       </div>
     );
   }
 
+  if (data.length === 0 || currentIndex >= data.length) {
+    return (
+      <div className="flex flex-col justify-center items-center min-h-screen">
+        <h2 className="text-2xl font-bold">🎉 No more pending images!</h2>
+        <p className="text-gray-600 mt-2">All images have been moderated</p>
+        <Button className="mt-4" onClick={fetchData}>
+          Refresh
+        </Button>
+      </div>
+    );
+  }
+
+  const currentImage = data[currentIndex];
+
   return (
-    <div className="min-h-screen">
-      <main className="max-w-7xl mx-auto py-5">
-        <div className="p-4">
-          <h1 className="text-3xl font-bold text-center mb-2">
-            Moderation Queue
-          </h1>
-          <p className="text-sm text-gray-500 text-center">
-            Approve or reject images.
+    <div className="flex flex-col items-center justify-center mt-10">
+      <div className="max-w-3xl w-full flex flex-col items-center">
+        <div className="mb-4 text-center">
+          <p className="text-sm text-gray-500">
+            Image {currentIndex + 1} of {data.length}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            Campaign: {currentImage.campaignName}
+            {currentImage.streamName && ` • Stream: ${currentImage.streamName}`}
           </p>
         </div>
-        <div className="px-4 py-3">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={() => handleModerate(selected, true)}
-                disabled={selected.length === 0}
-              >
-                Approve Selected
-              </Button>
-              <Button
-                onClick={() => handleModerate(selected, false)}
-                disabled={selected.length === 0}
-                variant="destructive"
-              >
-                Reject Selected
-              </Button>
-            </div>
 
-            {/* Filters Section */}
-            <div className="flex flex-col sm:flex-row gap-2 ">
-              {/* Filter by Status */}
-              <div className="flex-1 space-y-1">
-                <Label
-                  htmlFor="status-filter"
-                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  Status
-                </Label>
-                <Select value={filter} onValueChange={setFilter}>
-                  <SelectTrigger id="status-filter">
-                    <SelectValue placeholder="All Images" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Images</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="pending">Pending Review</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        {/* Fullscreen Image */}
+        <Image
+          src={currentImage.img}
+          alt={currentImage.name}
+          width={800}
+          height={800}
+          className="object-contain rounded-xl shadow-lg max-h-[80vh] w-auto"
+        />
 
-              {/* Filter by Stream */}
-              <div className="flex-1 space-y-1">
-                <Label
-                  htmlFor="stream-filter"
-                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  Assignment
-                </Label>
-                <Select
-                  value={streamFilter}
-                  onValueChange={setStreamFilter}
-                  onOpenChange={() => streamFilteredData()}
-                >
-                  <SelectTrigger id="stream-filter">
-                    <SelectValue placeholder="All Streams" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Images</SelectItem>
-                    <SelectItem value="assigned">In Streams</SelectItem>
-                    <SelectItem value="unassigned">Not Assigned</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Optional: Reset Button */}
-              <div className="flex-shrink-0 self-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setFilter("all");
-                    setStreamFilter("all");
-                  }}
-                  className="text-xs h-9 px-3 text-gray-600 dark:text-gray-300"
-                >
-                  Reset Filters
-                </Button>
-              </div>
-            </div>
-          </div>
+        {/* Meta info */}
+        <div className="mt-4 text-center">
+          <p className="text-lg font-semibold">{currentImage.name}</p>
+          {currentImage.description && (
+            <p className="text-sm text-gray-600 mt-1">
+              {currentImage.description}
+            </p>
+          )}
+          <p className="text-sm text-gray-400 mt-1">
+            {new Date(currentImage.date).toLocaleDateString()}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Source: {currentImage?.source?.replace("_", " ")}
+          </p>
         </div>
 
-        <div className="px-4 py-3">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>
-                  <Checkbox
-                    checked={
-                      selected.length === filteredData.length &&
-                      filteredData.length > 0
-                    }
-                    onCheckedChange={handleSelectAll}
-                  />
-                </TableHead>
-                <TableHead>Image</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredData.length > 0 ? (
-                filteredData.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selected.includes(item.id)}
-                        onCheckedChange={() => handleSelect(item.id)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Image
-                        src={item.img}
-                        alt={item.name}
-                        width={100}
-                        height={100}
-                        className="rounded-md object-cover"
-                      />
-                    </TableCell>
-                    <TableCell>{item.name}</TableCell>
-                    <TableCell>{item.date}</TableCell>
-                    <TableCell>
-                      {item.approved ? "Approved" : "Pending"}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        onClick={() => handleModerate([item.id], true)}
-                        disabled={item.approved}
-                        size="sm"
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        onClick={() => handleModerate([item.id], false)}
-                        disabled={!item.approved}
-                        variant="destructive"
-                        className="ml-2"
-                        size="sm"
-                      >
-                        Reject
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center">
-                    No Data found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+        {/* Approve / Reject buttons */}
+        <div className="flex gap-6 mt-6">
+          <Button
+            variant="destructive"
+            className="px-8 py-4 text-lg"
+            onClick={() => handleModerate(false)}
+          >
+            Reject
+          </Button>
+          <Button
+            className="px-8 py-4 text-lg"
+            onClick={() => handleModerate(true)}
+          >
+            Approve
+          </Button>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

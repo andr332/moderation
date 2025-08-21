@@ -1,28 +1,58 @@
-import { NextResponse } from "next/server";
-import { getImages, writeImages } from "@/lib/data";
+import { NextRequest, NextResponse } from 'next/server';
+import { dbConnect } from '@/lib/db';
+import Image from '@/models/Image';
 
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const { id, approved } = await request.json();
+    await dbConnect();
 
-    const images = await getImages();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const imageIndex = images.findIndex((image: any) => image.id === id);
-
-    if (imageIndex === -1) {
-      return NextResponse.json({ error: "Image not found" }, { status: 404 });
+    const { id, approved } = await req.json();
+    
+    if (!id || typeof approved !== 'boolean') {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'id and approved (boolean) are required' 
+      }, { status: 400 });
     }
 
-    images[imageIndex].approved = approved;
-
-    await writeImages(images);
-
-    return NextResponse.json({ success: true, image: images[imageIndex] });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json(
-      { error: "Failed to update image status" },
-      { status: 500 }
+    const status = approved ? 'approved' : 'rejected';
+    
+    const image = await Image.findByIdAndUpdate(
+      id, 
+      { 
+        status, 
+        approved,
+        updatedAt: new Date()
+      }, 
+      { new: true }
     );
+
+    if (!image) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Image not found' 
+      }, { status: 404 });
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      data: {
+        id: image._id.toString(),
+        img: image.img,
+        name: image.name,
+        description: image.description,
+        date: image.date.toISOString(),
+        approved: image.approved,
+        status: image.status,
+        campaignId: image.campaignId.toString(),
+        streamId: image.streamId?.toString()
+      }
+    });
+  } catch (error) {
+    console.error("Error moderating image:", error);
+    return NextResponse.json({ 
+      success: false, 
+      error: "Failed to moderate image" 
+    }, { status: 500 });
   }
 }

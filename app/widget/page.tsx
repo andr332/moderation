@@ -11,13 +11,21 @@ interface ImageType {
   id: string;
   img: string;
   name: string;
+  description?: string;
   date: string;
   approved: boolean;
+  status: "pending" | "approved" | "rejected";
+  campaignId: string;
+  campaignName: string;
+  streamId?: string;
+  streamName?: string;
+  source: "internal" | "external_app" | "manual";
 }
 
 function WidgetComponent() {
   const searchParams = useSearchParams();
   const displayMode = searchParams.get("displayMode") || "slideshow";
+  const streamId = searchParams.get("streamId");
 
   const [images, setImages] = useState<ImageType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,12 +36,21 @@ function WidgetComponent() {
   useEffect(() => {
     const fetchImages = async () => {
       try {
-        const response = await fetch("/api/images/approved");
+        const url = streamId
+          ? `/api/images?status=approved&streamId=${streamId}`
+          : "/api/images?status=approved";
+
+        const response = await fetch(url);
         if (!response.ok) {
           throw new Error("Failed to fetch images");
         }
-        const data = await response.json();
-        setImages(data);
+        const result = await response.json();
+
+        if (result.success) {
+          setImages(result.data);
+        } else {
+          throw new Error(result.error || "Failed to fetch images");
+        }
       } catch (err) {
         if (err instanceof Error) {
           setError(err.message);
@@ -46,7 +63,7 @@ function WidgetComponent() {
     };
 
     fetchImages();
-  }, []);
+  }, [streamId]);
 
   // Auto-play functionality for slideshow
   useEffect(() => {
@@ -104,6 +121,26 @@ function WidgetComponent() {
     );
   }
 
+  if (images.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center space-y-4 p-8 bg-white rounded-2xl shadow-lg max-w-md mx-4">
+          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto">
+            <span className="text-slate-500 text-2xl">📷</span>
+          </div>
+          <h2 className="text-xl font-semibold text-slate-800">
+            No images available
+          </h2>
+          <p className="text-slate-600">
+            {streamId
+              ? "This stream has no approved images yet."
+              : "No approved images found."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="sticky top-0 bg-white/50 backdrop-blur-xl z-40">
@@ -115,6 +152,9 @@ function WidgetComponent() {
               </h1>
               <p className="text-sm text-slate-600">
                 {images.length} images • {displayMode} view
+                {streamId &&
+                  images[0]?.streamName &&
+                  ` • ${images[0].streamName}`}
               </p>
             </div>
 
@@ -172,6 +212,11 @@ function WidgetComponent() {
                       <h3 className="font-semibold text-slate-800 group-hover:text-blue-600 transition-colors duration-200 line-clamp-2">
                         {image.name}
                       </h3>
+                      {image.description && (
+                        <p className="text-sm text-slate-600 line-clamp-2">
+                          {image.description}
+                        </p>
+                      )}
                       <div className="flex items-center justify-between">
                         <p className="text-sm text-slate-500">
                           {new Date(image.date).toLocaleDateString("en-US", {
@@ -179,6 +224,9 @@ function WidgetComponent() {
                             day: "numeric",
                             year: "numeric",
                           })}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {image.campaignName}
                         </p>
                       </div>
                     </div>
@@ -211,6 +259,11 @@ function WidgetComponent() {
                             <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
                               {image.name}
                             </h2>
+                            {image.description && (
+                              <p className="text-white/90 text-sm sm:text-base mb-2">
+                                {image.description}
+                              </p>
+                            )}
                             <p className="text-white/90 text-sm sm:text-base">
                               {new Date(image.date).toLocaleDateString(
                                 "en-US",
@@ -221,6 +274,9 @@ function WidgetComponent() {
                                   day: "numeric",
                                 }
                               )}
+                            </p>
+                            <p className="text-white/80 text-xs mt-1">
+                              {image.campaignName}
                             </p>
                           </div>
                         </div>
