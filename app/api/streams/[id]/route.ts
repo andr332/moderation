@@ -1,6 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import Stream from "@/models/Streams";
+import { Stream, Campaign } from "@/models";
+import {
+  uploadToGridFS,
+  getFileFromGridFS,
+  deleteFileFromGridFS,
+} from "@/lib/gridfs";
 
 export async function GET(
   req: NextRequest,
@@ -33,9 +39,9 @@ export async function GET(
           name: campaign.name,
           description: campaign.description,
         })),
-        logoUrl: stream.logoUrl,
-        isActive: stream.isActive,
-        displaySettings: stream.displaySettings,
+        logoUrl: stream.logoFileId
+          ? `/api/files/${stream.logoFileId}`
+          : stream.logoUrl,
         createdAt: stream.createdAt.toISOString(),
         updatedAt: stream.updatedAt.toISOString(),
       },
@@ -49,6 +55,93 @@ export async function GET(
   }
 }
 
+export async function POST(req: NextRequest) {
+  try {
+    await dbConnect();
+
+    const formData = await req.formData();
+    const name = formData.get("name") as string;
+    const campaignIds = formData.get("campaignIds") as string;
+    const logoFile = formData.get("logo") as File;
+
+    if (!name) {
+      return NextResponse.json(
+        { success: false, error: "name is required" },
+        { status: 400 }
+      );
+    }
+
+    let logoFileId = undefined;
+
+    // Handle logo upload
+    if (logoFile) {
+      try {
+        // Upload the file to GridFS
+        const uploadFormData = new FormData();
+        uploadFormData.append("file", logoFile);
+
+        const uploadResponse = await fetch(`${req.nextUrl.origin}/api/upload`, {
+          method: "POST",
+          body: uploadFormData,
+        });
+
+        if (uploadResponse.ok) {
+          const uploadResult = await uploadResponse.json();
+          logoFileId = uploadResult.data.fileId;
+        } else {
+          console.error("Failed to upload logo");
+        }
+      } catch (error) {
+        console.error("Error uploading logo:", error);
+      }
+    }
+
+    // Parse campaign IDs
+    const parsedCampaignIds = campaignIds ? JSON.parse(campaignIds) : [];
+
+    const stream = await Stream.create({
+      name,
+      campaignIds: parsedCampaignIds,
+      logoFileId,
+    });
+
+    // Populate the campaign data for the response
+    const populatedStream = await Stream.findById(stream._id).populate(
+      "campaignIds",
+      "name description"
+    );
+
+    const streamData = {
+      id: populatedStream._id.toString(),
+      name: populatedStream.name,
+      campaigns: populatedStream.campaignIds.map((campaign: any) => ({
+        id: campaign._id.toString(),
+        name: campaign.name,
+        description: campaign.description,
+      })),
+      logoUrl: populatedStream.logoFileId
+        ? `/api/files/${populatedStream.logoFileId}`
+        : undefined,
+      createdAt: populatedStream.createdAt.toISOString(),
+      updatedAt: populatedStream.updatedAt.toISOString(),
+    };
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: streamData,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("Error creating stream:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to create stream" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PUT(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -57,43 +150,74 @@ export async function PUT(
     await dbConnect();
     const { id } = await context.params;
 
-    const body = await req.json();
-    const { name, campaignIds, logoUrl, displaySettings, isActive } = body;
+    const formData = await req.formData();
+    const name = formData.get("name") as string;
+    const campaignIds = formData.get("campaignIds") as string;
+    const logoFile = formData.get("logo") as File;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const updateData: any = {};
+    let logoFileId = undefined;
 
-    if (name) updateData.name = name;
-    if (campaignIds) updateData.campaignIds = campaignIds;
-    if (logoUrl !== undefined) updateData.logoUrl = logoUrl;
-    if (displaySettings) updateData.displaySettings = displaySettings;
-    if (isActive !== undefined) updateData.isActive = isActive;
+    // Handle logo upload
+    if (logoFile) {
+      try {
+        // Upload the file to GridFS
+        const uploadFormData = new FormData();
+        uploadFormData.append("file", logoFile);
 
-    const stream = await Stream.findByIdAndUpdate(
+        const uploadResponse = await fetch(`${req.nextUrl.origin}/api/upload`, {
+          method: "POST",
+          body: uploadFormData,
+        });
+
+        if (uploadResponse.ok) {
+          const uploadResult = await uploadResponse.json();
+          logoFileId = uploadResult.data.fileId;
+        } else {
+          console.error("Failed to upload logo");
+        }
+      } catch (error) {
+        console.error("Error uploading logo:", error);
+      }
+    }
+
+    // Parse campaign IDs
+    const parsedCampaignIds = campaignIds ? JSON.parse(campaignIds) : [];
+
+    const updatedStream = await Stream.findByIdAndUpdate(
       id,
-      { ...updateData, updatedAt: new Date() },
+      {
+        name,
+        campaignIds: parsedCampaignIds,
+        ...(logoFileId && { logoFileId }),
+      },
       { new: true }
-    );
+    ).populate("campaignIds", "name description");
 
-    if (!stream) {
+    if (!updatedStream) {
       return NextResponse.json(
         { success: false, error: "Stream not found" },
         { status: 404 }
       );
     }
 
+    const streamData = {
+      id: updatedStream._id.toString(),
+      name: updatedStream.name,
+      campaigns: updatedStream.campaignIds.map((campaign: any) => ({
+        id: campaign._id.toString(),
+        name: campaign.name,
+        description: campaign.description,
+      })),
+      logoUrl: updatedStream.logoFileId
+        ? `/api/files/${updatedStream.logoFileId}`
+        : undefined,
+      createdAt: updatedStream.createdAt.toISOString(),
+      updatedAt: updatedStream.updatedAt.toISOString(),
+    };
+
     return NextResponse.json({
       success: true,
-      data: {
-        id: stream._id.toString(),
-        name: stream.name,
-        campaignIds: stream.campaignIds,
-        logoUrl: stream.logoUrl,
-        isActive: stream.isActive,
-        displaySettings: stream.displaySettings,
-        createdAt: stream.createdAt.toISOString(),
-        updatedAt: stream.updatedAt.toISOString(),
-      },
+      data: streamData,
     });
   } catch (error) {
     console.error("Error updating stream:", error);
@@ -112,11 +236,7 @@ export async function DELETE(
     await dbConnect();
     const { id } = await context.params;
 
-    const stream = await Stream.findByIdAndUpdate(
-      id,
-      { isActive: false, updatedAt: new Date() },
-      { new: true }
-    );
+    const stream = await Stream.findById(id);
 
     if (!stream) {
       return NextResponse.json(
@@ -125,9 +245,16 @@ export async function DELETE(
       );
     }
 
+    // Delete logo file from GridFS if it exists
+    if (stream.logoFileId) {
+      await deleteFileFromGridFS(stream.logoFileId);
+    }
+
+    await Stream.findByIdAndDelete(id);
+
     return NextResponse.json({
       success: true,
-      message: "Stream deactivated successfully",
+      message: "Stream deleted successfully",
     });
   } catch (error) {
     console.error("Error deleting stream:", error);

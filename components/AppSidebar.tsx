@@ -1,7 +1,8 @@
 "use client";
 
-import { Home, Image } from "lucide-react";
+import { Home, Image, Settings } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Sidebar,
   SidebarContent,
@@ -13,10 +14,11 @@ import {
   SidebarHeader,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 
 const items = [
   {
-    title: "Home",
+    title: "Dashboard",
     url: "/",
     icon: Home,
   },
@@ -28,31 +30,46 @@ const items = [
 ];
 
 export function AppSidebar() {
+  const pathname = usePathname();
+
   return (
-    <Sidebar className="bg-gradient-to-b from-[#e0e7ff] to-[#f8f9fc] shadow-lg border-r border-gray-200">
+    <Sidebar className="border-r bg-card">
       <SidebarContent>
         <SidebarHeader className="flex items-center justify-center py-6">
-          <span className="text-2xl font-bold text-indigo-600 tracking-tight">
-            Moderation Tool
-          </span>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+              <Image className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <span className="text-xl font-bold text-foreground">
+              LiveDB Stream
+            </span>
+          </div>
         </SidebarHeader>
         <SidebarSeparator />
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="hover:bg-indigo-100 hover:text-indigo-700 transition-colors rounded-lg px-3 py-2 flex items-center gap-3"
-                  >
-                    <Link href={item.url} className="flex items-center gap-3">
-                      <item.icon className="w-5 h-5" />
-                      <span className="font-medium">{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {items.map((item) => {
+                const isActive = pathname === item.url;
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      className={cn(
+                        "w-full justify-start gap-3 rounded-xl transition-colors",
+                        isActive
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "hover:bg-accent hover:text-accent-foreground"
+                      )}
+                    >
+                      <Link href={item.url} className="flex items-center gap-3">
+                        <item.icon className="w-5 h-5" />
+                        <span className="font-medium">{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

@@ -7,7 +7,7 @@ export interface IImage extends Document {
   description?: string;
   date: Date;
   approved: boolean;
-  status: "pending" | "approved" | "rejected";
+  status: "approved" | "rejected";
   campaignId: string;
   streamId?: string;
   source: "internal" | "external_app" | "manual";
@@ -40,8 +40,8 @@ const ImageSchema: Schema = new Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected"],
-      default: "pending",
+      enum: ["approved", "rejected"],
+      default: "rejected", // Changed default to rejected since there's no pending
     },
     campaignId: {
       type: Schema.Types.ObjectId,
@@ -52,6 +52,11 @@ const ImageSchema: Schema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Stream",
       default: null,
+    },
+    source: {
+      type: String,
+      enum: ["internal", "external_app", "manual"],
+      default: "manual",
     },
   },
   {

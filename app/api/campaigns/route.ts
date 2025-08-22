@@ -1,13 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
-import Campaign from "@/models/Campaign";
 import { dbConnect } from "@/lib/db";
+import { Campaign } from "@/models";
 
 export async function GET() {
   try {
     await dbConnect();
 
     const campaigns = await Campaign.find()
-      .populate("streamId", "name")
+      .populate("imageIds", "img name description approved status date")
       .sort({ createdAt: -1 });
 
     return NextResponse.json({
@@ -16,9 +17,16 @@ export async function GET() {
         id: campaign._id.toString(),
         name: campaign.name,
         description: campaign.description,
-        images: campaign.images,
-        streamId: campaign.streamId._id.toString(),
-        streamName: campaign.streamId.name,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        images: campaign.imageIds.map((image: any) => ({
+          id: image._id.toString(),
+          img: image.img,
+          name: image.name,
+          description: image.description,
+          approved: image.approved,
+          status: image.status,
+          date: image.date.toISOString(),
+        })),
         createdAt: campaign.createdAt.toISOString(),
         updatedAt: campaign.updatedAt.toISOString(),
       })),
@@ -37,11 +45,11 @@ export async function POST(req: NextRequest) {
     await dbConnect();
 
     const body = await req.json();
-    const { name, description, images, streamId } = body;
+    const { name, description, imageIds, streamId } = body;
 
-    if (!name || !images || !streamId) {
+    if (!name || !streamId) {
       return NextResponse.json(
-        { success: false, error: "name, images, and streamId are required" },
+        { success: false, error: "name and streamId are required" },
         { status: 400 }
       );
     }
@@ -49,14 +57,13 @@ export async function POST(req: NextRequest) {
     const campaign = await Campaign.create({
       name,
       description,
-      images,
+      imageIds: imageIds || [],
       streamId,
     });
 
-    const populatedCampaign = await Campaign.findById(campaign._id).populate(
-      "streamId",
-      "name"
-    );
+    const populatedCampaign = await Campaign.findById(campaign._id)
+      .populate("streamId", "name")
+      .populate("imageIds", "img name description approved status date");
 
     return NextResponse.json(
       {
@@ -65,7 +72,15 @@ export async function POST(req: NextRequest) {
           id: populatedCampaign._id.toString(),
           name: populatedCampaign.name,
           description: populatedCampaign.description,
-          images: populatedCampaign.images,
+          images: populatedCampaign.imageIds.map((image: any) => ({
+            id: image._id.toString(),
+            img: image.img,
+            name: image.name,
+            description: image.description,
+            approved: image.approved,
+            status: image.status,
+            date: image.date.toISOString(),
+          })),
           streamId: populatedCampaign.streamId._id.toString(),
           streamName: populatedCampaign.streamId.name,
           createdAt: populatedCampaign.createdAt.toISOString(),
@@ -76,12 +91,6 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error("Error creating campaign:", error);
-    // if (error?.code === 11000) {
-    //   return NextResponse.json(
-    //     { success: false, error: "Campaign name already exists" },
-    //     { status: 409 }
-    //   );
-    // }
     return NextResponse.json(
       { success: false, error: "Failed to create campaign" },
       { status: 500 }

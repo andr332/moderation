@@ -4,18 +4,8 @@ export interface IStream extends Document {
   _id: string;
   name: string;
   campaignIds: string[];
-  logoUrl?: string;
-  isActive: boolean;
-  displaySettings: {
-    mode: "grid" | "slideshow";
-    autoPlay: boolean;
-    slideInterval: number;
-    showMetadata: boolean;
-    theme: {
-      primaryColor: string;
-      backgroundColor: string;
-    };
-  };
+  logoFileId?: string; // Store the GridFS file ID
+  logoUrl?: string; // Keep for backward compatibility
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,43 +21,14 @@ const StreamSchema: Schema = new Schema(
       {
         type: Schema.Types.ObjectId,
         ref: "Campaign",
+        required: true,
       },
     ],
-    logoUrl: {
+    logoFileId: {
       type: String,
     },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-    displaySettings: {
-      mode: {
-        type: String,
-        enum: ["grid", "slideshow"],
-        default: "grid",
-      },
-      autoPlay: {
-        type: Boolean,
-        default: false,
-      },
-      slideInterval: {
-        type: Number,
-        default: 5,
-      },
-      showMetadata: {
-        type: Boolean,
-        default: true,
-      },
-      theme: {
-        primaryColor: {
-          type: String,
-          default: "#3B82F6",
-        },
-        backgroundColor: {
-          type: String,
-          default: "#F8FAFC",
-        },
-      },
+    logoUrl: {
+      type: String,
     },
   },
   {

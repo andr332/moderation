@@ -4,8 +4,7 @@ export interface ICampaign extends Document {
   _id: string;
   name: string;
   description?: string;
-  images: string[];
-  streamId: string;
+  imageIds: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,14 +21,10 @@ const CampaignSchema: Schema = new Schema(
       type: String,
       trim: true,
     },
-    images: {
-      type: [String],
-      required: true,
-    },
-    streamId: {
-      type: Schema.Types.ObjectId,
-      ref: "Stream",
-      required: true,
+    imageIds: {
+      type: [Schema.Types.ObjectId],
+      ref: "Image",
+      default: [],
     },
   },
   {
