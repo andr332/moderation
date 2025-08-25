@@ -4,8 +4,12 @@ import Stream from "@/models/Streams";
 import Campaign from "@/models/Campaign";
 import Streams from "@/components/Streams";
 import React from "react";
+import { unstable_noStore as noStore } from "next/cache";
+
+export const revalidate = 0;
 
 async function getStreamsData() {
+  noStore();
   try {
     await dbConnect();
 

@@ -4,12 +4,16 @@ import { Stream } from "@/models";
 import { notFound } from "next/navigation";
 import React from "react";
 import StreamDetails from "@/components/StreamDetails";
+import { unstable_noStore as noStore } from "next/cache";
 
 interface StreamDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
+export const revalidate = 0;
+
 async function getStreamData(streamId: string) {
+  noStore();
   try {
     await dbConnect();
 

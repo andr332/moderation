@@ -82,8 +82,7 @@ const StreamCard = ({ stream, onEdit, onDelete, onEmbed }: StreamCardProps) => {
             </TooltipProvider>
           </div>
         </div>
-      </CardHeader>{" "}
-      p
+      </CardHeader>
       <CardContent className="space-y-4">
         {stream.logoUrl && (
           <div className="flex justify-center">

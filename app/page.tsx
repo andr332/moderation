@@ -2,8 +2,12 @@ import { dbConnect } from "@/lib/db";
 
 import ModerationQueue from "@/components/ModerationQueue";
 import { Image } from "@/models";
+import { unstable_noStore as noStore } from "next/cache";
+
+export const revalidate = 0;
 
 async function getImages() {
+  noStore();
   try {
     await dbConnect();
 
