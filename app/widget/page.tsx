@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, Play, Pause } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 
 interface ImageType {
   id: string;
@@ -36,53 +35,33 @@ function WidgetComponent() {
   const [isAutoPlay, setIsAutoPlay] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
-
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  // Parse the color and create CSS variables
   const primaryColor = color;
-  const primaryColorLight = `${color}20`; // 20% opacity
-  const primaryColorDark = color;
+  const primaryColorLight = `${color}20`;
 
-  // Function to fetch images
   const fetchImages = async () => {
-    console.log("=== fetchImages function called ===");
     try {
-      let url = "/api/images?status=approved";
-
-      if (streamId) {
-        url = `/api/images?status=approved&streamId=${streamId}`;
+      if (!streamId) {
+        setStreamError("Stream ID is required to view this page.");
+        setImages([]);
+        setLoading(false);
+        return;
       }
-
-      console.log("=== WIDGET DEBUG START ===");
-      console.log("Widget streamId:", streamId);
-      console.log("Widget displayMode:", displayMode);
-      console.log("Fetching images from:", url);
-
+      const url = `/api/images?status=approved&streamId=${streamId}`;
       const response = await fetch(url);
-      console.log("Response status:", response.status);
-      console.log("Response ok:", response.ok);
-
       if (!response.ok) {
         if (response.status === 404) {
           throw new Error("Stream not found");
         }
         throw new Error("Failed to fetch images");
       }
-
       const result = await response.json();
-      console.log("API Response:", result);
-      console.log("Response success:", result.success);
-      console.log("Response data length:", result.data?.length);
-
       if (result.success) {
-        console.log("Images found:", result.data.length);
-        console.log("First few images:", result.data.slice(0, 3));
         setImages(result.data);
         setLastUpdate(new Date());
         setStreamError(null); // Clear any previous stream errors
       } else {
-        console.log("API returned error:", result.error);
         if (
           result.error?.includes("Stream not found") ||
           result.error?.includes("Invalid stream")
@@ -93,9 +72,7 @@ function WidgetComponent() {
           throw new Error(result.error || "Failed to fetch images");
         }
       }
-      console.log("=== WIDGET DEBUG END ===");
     } catch (err) {
-      console.error("Error in fetchImages:", err);
       if (err instanceof Error) {
         if (err.message === "Stream not found") {
           setStreamError("Invalid or missing stream ID");
@@ -111,20 +88,8 @@ function WidgetComponent() {
     }
   };
 
-  // Also add this to see when the component mounts
   useEffect(() => {
-    console.log("=== Widget component mounted ===");
-    console.log("Initial streamId:", streamId);
-    console.log("Initial displayMode:", displayMode);
-  }, []);
-
-  // Set up SSE for real-time updates
-  useEffect(() => {
-    console.log("=== useEffect for SSE/fetchImages ===");
-    console.log("streamId:", streamId);
-
     if (!streamId) {
-      console.log("No streamId, calling fetchImages directly");
       fetchImages();
       return;
     }
@@ -132,30 +97,24 @@ function WidgetComponent() {
     // Try SSE first, fallback to regular fetch
     const setupSSE = () => {
       try {
-        console.log("Setting up SSE for streamId:", streamId);
         const eventSource = new EventSource(
           `/api/widget/updates?streamId=${streamId}`
         );
         eventSourceRef.current = eventSource;
-
         // Add a timeout to fallback to regular fetch if SSE doesn't respond
         const timeout = setTimeout(() => {
-          console.log("SSE timeout, falling back to fetchImages");
           eventSource.close();
           fetchImages();
         }, 3000); // 3 second timeout
 
         eventSource.onopen = () => {
-          console.log("SSE connection opened");
           clearTimeout(timeout);
         };
 
         eventSource.onmessage = (event) => {
-          console.log("SSE message received:", event.data);
           try {
             const data = JSON.parse(event.data);
             if (data.type === "update" || data.type === "initial") {
-              console.log("SSE data received:", data);
               setImages(data.images);
               setLastUpdate(new Date());
               setLoading(false);
@@ -169,8 +128,6 @@ function WidgetComponent() {
           console.error("SSE error:", error);
           clearTimeout(timeout);
           eventSource.close();
-          // Fallback to regular polling
-          console.log("SSE failed, falling back to fetchImages");
           fetchImages();
         };
 
@@ -180,8 +137,6 @@ function WidgetComponent() {
         };
       } catch (error) {
         console.error("Error setting up SSE:", error);
-        // Fallback to regular polling
-        console.log("SSE setup failed, falling back to fetchImages");
         fetchImages();
       }
     };

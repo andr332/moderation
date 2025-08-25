@@ -1,12 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { Stream, Campaign } from "@/models";
-import {
-  uploadToGridFS,
-  getFileFromGridFS,
-  deleteFileFromGridFS,
-} from "@/lib/gridfs";
+import { Stream } from "@/models";
+import { deleteFileFromGridFS } from "@/lib/gridfs";
 
 export async function GET(
   req: NextRequest,

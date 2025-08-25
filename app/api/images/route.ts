@@ -13,31 +13,19 @@ export async function GET(req: NextRequest) {
     const streamId = searchParams.get("streamId");
     const assignment = searchParams.get("assignment");
 
-    console.log("=== API DEBUG START ===");
-    console.log("Request URL:", req.url);
-    console.log("Status filter:", status);
-    console.log("Campaign ID filter:", campaignId);
-    console.log("Stream ID filter:", streamId);
-    console.log("Assignment filter:", assignment);
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {};
 
     if (status) query.status = status;
     if (campaignId) query.campaignId = campaignId;
 
-    console.log("Initial query:", query);
-
     // Handle stream filtering - get campaign IDs from the stream
     if (streamId) {
       try {
-        console.log("Looking for stream:", streamId);
-
         // Get the stream and its campaign IDs
         const stream = await Stream.findById(streamId).select("campaignIds");
 
         if (!stream) {
-          console.log("Stream not found:", streamId);
           return NextResponse.json({
             success: true,
             data: [],
@@ -45,7 +33,6 @@ export async function GET(req: NextRequest) {
         }
 
         if (!stream.campaignIds || stream.campaignIds.length === 0) {
-          console.log("No campaigns in stream:", streamId);
           return NextResponse.json({
             success: true,
             data: [],
@@ -54,9 +41,6 @@ export async function GET(req: NextRequest) {
 
         // Filter images by campaign IDs from the stream
         query.campaignId = { $in: stream.campaignIds };
-
-        console.log("Stream campaign IDs:", stream.campaignIds);
-        console.log("Query after stream filter:", query);
       } catch (error) {
         console.error("Error finding stream:", error);
         return NextResponse.json({
@@ -73,32 +57,12 @@ export async function GET(req: NextRequest) {
       query.streamId = null; // Images that don't have a stream assigned
     }
 
-    console.log("Final query before Image.find:", query);
-
     const images = await Image.find(query)
       .populate({
         path: "campaignId",
         select: "name description", // Remove the nested populate since Campaign no longer has streamId
       })
       .sort({ createdAt: -1 });
-
-    console.log("Raw images found:", images.length);
-    console.log(
-      "Raw images data:",
-      images.map((img) => ({
-        id: img._id.toString(),
-        name: img.name,
-        status: img.status,
-        approved: img.approved,
-        campaignId: img.campaignId?._id?.toString(),
-        campaignName: img.campaignId?.name,
-      }))
-    );
-
-    // Debug logging
-    console.log("Stream ID:", streamId);
-    console.log("Query:", query);
-    console.log("Found images:", images.length);
 
     const processedData = images.map((img) => ({
       id: img._id.toString(),
@@ -112,9 +76,6 @@ export async function GET(req: NextRequest) {
       campaignName: img.campaignId.name,
       source: img.source,
     }));
-
-    console.log("Processed data:", processedData);
-    console.log("=== API DEBUG END ===");
 
     return NextResponse.json({
       success: true,

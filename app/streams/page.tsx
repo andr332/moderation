@@ -28,9 +28,7 @@ async function getStreamsData() {
         description: campaign.description,
       })),
       logoUrl: stream.logoFileId
-        ? `${
-            process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"
-          }/api/files/${stream.logoFileId}`
+        ? `${process.env.NEXT_PUBLIC_APP_URL}/api/files/${stream.logoFileId}`
         : stream.logoUrl,
       createdAt: stream.createdAt.toISOString(),
       updatedAt: stream.updatedAt.toISOString(),

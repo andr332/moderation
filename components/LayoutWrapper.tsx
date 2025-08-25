@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Toaster } from "sonner";
 
 interface LayoutWrapperProps {
   children: React.ReactNode;
@@ -29,6 +30,7 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
           <div className="flex-1 p-4 sm:p-6 lg:p-8">{children}</div>
         </main>
       </div>
+      <Toaster position="bottom-right" />
     </SidebarProvider>
   );
 }

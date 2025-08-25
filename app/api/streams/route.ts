@@ -3,16 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import { Stream } from "@/models";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     await dbConnect();
-
-    console.log("streams");
 
     const streams = await Stream.find()
       .populate("campaignIds", "name description")
       .sort({ createdAt: -1 });
-    console.log("streams datat", streams);
 
     const streamsData = streams.map((stream) => ({
       id: stream._id.toString(),
@@ -23,7 +20,7 @@ export async function GET(req: NextRequest) {
         description: campaign.description,
       })),
       logoUrl: stream.logoFileId
-        ? `http://localhost:3001/api/files/${stream.logoFileId}`
+        ? `${process.env.NEXT_PUBLIC_APP_URL}/api/files/${stream.logoFileId}`
         : stream.logoUrl,
       createdAt: stream.createdAt.toISOString(),
       updatedAt: stream.updatedAt.toISOString(),
@@ -107,7 +104,7 @@ export async function POST(req: NextRequest) {
         description: campaign.description,
       })),
       logoUrl: populatedStream.logoFileId
-        ? `http://localhost:3001/api/files/${populatedStream.logoFileId}`
+        ? `${process.env.NEXT_PUBLIC_APP_URL}/api/files/${populatedStream.logoFileId}`
         : undefined,
       createdAt: populatedStream.createdAt.toISOString(),
       updatedAt: populatedStream.updatedAt.toISOString(),

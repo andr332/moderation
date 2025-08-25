@@ -62,6 +62,7 @@ export const getFileFromGridFS = async (fileId: string) => {
       downloadStream.on("error", reject);
     });
   } catch (error) {
+    console.error("Failed to get file:", error);
     throw new Error("File not found");
   }
 };
@@ -72,6 +73,7 @@ export const deleteFileFromGridFS = async (fileId: string) => {
   try {
     await gridFSBucket.delete(new mongoose.Types.ObjectId(fileId));
   } catch (error) {
+    console.error("Failed to delete file:", error);
     throw new Error("Failed to delete file");
   }
 };

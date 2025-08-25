@@ -26,10 +26,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Here you could trigger a real-time update notification
-    // For example, emit a WebSocket event or update a cache
-    console.log(`Image ${id} ${approved ? "approved" : "rejected"}`);
-
     return NextResponse.json({
       success: true,
       data: {

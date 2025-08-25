@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -25,14 +24,12 @@ import {
 } from "@/components/ui/table";
 import Image from "next/image";
 import {
-  ArrowLeft,
   Image as ImageIcon,
   FolderOpen,
   BarChart3,
   Shield,
   CheckCircle,
   XCircle,
-  Filter,
   Search,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
