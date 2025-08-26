@@ -34,6 +34,13 @@ async function getStreamsData() {
       logoUrl: stream.logoFileId
         ? `${process.env.NEXT_PUBLIC_APP_URL}/api/files/${stream.logoFileId}`
         : stream.logoUrl,
+      widgetConfig: stream.widgetConfig
+        ? {
+            displayMode: stream.widgetConfig.displayMode,
+            color: stream.widgetConfig.color,
+            showLogo: stream.widgetConfig.showLogo,
+          }
+        : undefined,
       createdAt: stream.createdAt.toISOString(),
       updatedAt: stream.updatedAt.toISOString(),
     }));

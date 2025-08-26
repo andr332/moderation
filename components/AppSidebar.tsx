@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, Image } from "lucide-react";
+import { Home, Image as ImageIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -25,7 +25,7 @@ const items = [
   {
     title: "Streams",
     url: "/streams",
-    icon: Image,
+    icon: ImageIcon,
   },
 ];
 
@@ -38,7 +38,7 @@ export function AppSidebar() {
         <SidebarHeader className="flex items-center justify-center py-6">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Image className="w-5 h-5 text-primary-foreground" />
+              <ImageIcon className="w-5 h-5 text-primary-foreground" />
             </div>
             <span className="text-xl font-bold text-foreground">
               LiveDB Stream

@@ -22,6 +22,7 @@ export async function GET() {
       logoUrl: stream.logoFileId
         ? `${process.env.NEXT_PUBLIC_APP_URL}/api/files/${stream.logoFileId}`
         : stream.logoUrl,
+      widgetConfig: stream.widgetConfig,
       createdAt: stream.createdAt.toISOString(),
       updatedAt: stream.updatedAt.toISOString(),
     }));
@@ -47,6 +48,9 @@ export async function POST(req: NextRequest) {
     const name = formData.get("name") as string;
     const campaignIds = formData.get("campaignIds") as string;
     const logoFile = formData.get("logo") as File;
+    const displayMode = formData.get("displayMode") as string;
+    const color = formData.get("color") as string;
+    const showLogo = formData.get("showLogo") as string;
 
     if (!name) {
       return NextResponse.json(
@@ -83,10 +87,18 @@ export async function POST(req: NextRequest) {
     // Parse campaign IDs
     const parsedCampaignIds = campaignIds ? JSON.parse(campaignIds) : [];
 
+    // Parse widget config
+    const widgetConfig = {
+      displayMode: displayMode === "slideshow" ? "slideshow" : "grid",
+      color: color || "#3B82F6",
+      showLogo: showLogo === "true",
+    };
+
     const stream = await Stream.create({
       name,
       campaignIds: parsedCampaignIds,
       logoFileId,
+      widgetConfig,
     });
 
     // Populate the campaign data for the response
@@ -106,6 +118,7 @@ export async function POST(req: NextRequest) {
       logoUrl: populatedStream.logoFileId
         ? `${process.env.NEXT_PUBLIC_APP_URL}/api/files/${populatedStream.logoFileId}`
         : undefined,
+      widgetConfig: populatedStream.widgetConfig,
       createdAt: populatedStream.createdAt.toISOString(),
       updatedAt: populatedStream.updatedAt.toISOString(),
     };

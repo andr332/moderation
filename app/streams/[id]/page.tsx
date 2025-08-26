@@ -38,7 +38,16 @@ async function getStreamData(streamId: string) {
     const streamData = {
       id: streamDoc._id.toString(),
       name: streamDoc.name,
-      logoUrl: streamDoc.logoUrl,
+      logoUrl: streamDoc.logoFileId
+        ? `${process.env.NEXT_PUBLIC_APP_URL}/api/files/${streamDoc.logoFileId}`
+        : streamDoc.logoUrl,
+      widgetConfig: streamDoc.widgetConfig
+        ? {
+            displayMode: streamDoc.widgetConfig.displayMode,
+            color: streamDoc.widgetConfig.color,
+            showLogo: streamDoc.widgetConfig.showLogo,
+          }
+        : undefined,
       createdAt: streamDoc.createdAt.toISOString(),
       updatedAt: streamDoc.updatedAt.toISOString(),
     };

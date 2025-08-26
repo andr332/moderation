@@ -4,37 +4,40 @@ export interface IStream extends Document {
   _id: string;
   name: string;
   campaignIds: string[];
-  logoFileId?: string; // Store the GridFS file ID
-  logoUrl?: string; // Keep for backward compatibility
+  widgetConfig: {
+    displayMode: "grid" | "slideshow";
+    color: string;
+    showLogo: boolean;
+  };
+  logoFileId?: string;
+  logoUrl?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const StreamSchema: Schema = new Schema(
-  {
-    name: {
+const StreamSchema = new Schema({
+  name: { type: String, required: true },
+  logoUrl: { type: String },
+  campaignIds: [{ type: Schema.Types.ObjectId, ref: "Campaign" }],
+  widgetConfig: {
+    displayMode: {
       type: String,
-      required: true,
-      trim: true,
+      enum: ["grid", "slideshow"],
+      default: "grid",
     },
-    campaignIds: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "Campaign",
-        required: true,
-      },
-    ],
-    logoFileId: {
+    color: {
       type: String,
+      default: "#3B82F6",
     },
-    logoUrl: {
-      type: String,
+    showLogo: {
+      type: Boolean,
+      default: true,
     },
   },
-  {
-    timestamps: true,
-  }
-);
+  logoFileId: { type: String },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
 
 export default mongoose.models.Stream ||
   mongoose.model<IStream>("Stream", StreamSchema);

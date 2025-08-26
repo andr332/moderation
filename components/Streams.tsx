@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,6 +27,8 @@ const Streams = ({
     updateStream: false,
     deleteStream: false,
   });
+
+  // Create/Edit dialog state
   const [isOpen, setIsOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingStreamId, setEditingStreamId] = useState<string | null>(null);
@@ -35,30 +36,30 @@ const Streams = ({
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [logoFile, setLogoFile] = useState<File | null>(null);
 
-  // Config dialog
+  // Widget configuration state
+  const [displayMode, setDisplayMode] = useState<"grid" | "slideshow">("grid");
+  const [color, setColor] = useState("#3B82F6");
+  const [showLogo, setShowLogo] = useState(true);
+
+  // Embed dialog state
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [selectedStream, setSelectedStream] = useState<Stream | null>(null);
-  const [displayMode, setDisplayMode] = useState<"grid" | "slideshow">("grid");
-  const [selectedColor, setSelectedColor] = useState("#3B82F6");
   const [generatedScript, setGeneratedScript] = useState("");
   const [generatedUrl, setGeneratedUrl] = useState("");
   const [generatedQR, setGeneratedQR] = useState("");
-  const [showLogo, setShowLogo] = useState(true);
 
   const router = useRouter();
 
   const fetchData = async () => {
-    setLoading({ ...loading, initial: true });
+    setLoading((s) => ({ ...s, initial: true }));
     try {
       const [streamsResponse, campaignsResponse] = await Promise.all([
         fetch("/api/streams"),
         fetch("/api/campaigns"),
       ]);
-
       if (streamsResponse.ok && campaignsResponse.ok) {
         const streamsData = await streamsResponse.json();
         const campaignsData = await campaignsResponse.json();
-
         if (streamsData.success && campaignsData.success) {
           setStreams(streamsData.data);
           setCampaigns(campaignsData.data);
@@ -68,7 +69,7 @@ const Streams = ({
       console.error("Error fetching data:", error);
       toast.error("Failed to load data");
     } finally {
-      setLoading({ ...loading, initial: false });
+      setLoading((s) => ({ ...s, initial: false }));
     }
   };
 
@@ -82,43 +83,55 @@ const Streams = ({
     setNewName("");
     setSelectedCampaigns([]);
     setLogoFile(null);
-    setIsEditMode(false);
-    setEditingStreamId(null);
+    setDisplayMode("grid");
+    setColor("#3B82F6");
+    setShowLogo(true);
   };
 
   const openCreateDialog = () => {
+    setIsEditMode(false);
+    setEditingStreamId(null);
     resetForm();
     setIsOpen(true);
   };
 
-  const handleEditStream = (streamId: string) => {
-    const streamToEdit = streams.find((s) => s.id === streamId);
-    if (streamToEdit) {
-      setNewName(streamToEdit.name);
-      setSelectedCampaigns(streamToEdit.campaigns.map((c) => c.id));
-      setLogoFile(null);
-      setIsEditMode(true);
-      setEditingStreamId(streamId);
-      setIsOpen(true);
+  const openEditDialog = (stream: Stream) => {
+    console.log("Opening edit dialog for stream:", stream);
+    console.log("Stream widgetConfig:", stream.widgetConfig);
+
+    setIsEditMode(true);
+    setEditingStreamId(stream.id);
+    setNewName(stream.name);
+    setSelectedCampaigns(stream.campaigns.map((c) => c.id));
+    setLogoFile(null);
+
+    // Set widget configuration from stream
+    if (stream.widgetConfig) {
+      console.log("Setting widget config:", stream.widgetConfig);
+      setDisplayMode(stream.widgetConfig.displayMode);
+      setColor(stream.widgetConfig.color);
+      setShowLogo(stream.widgetConfig.showLogo);
+    } else {
+      console.log("No widget config found, using defaults");
+      setDisplayMode("grid");
+      setColor("#3B82F6");
+      setShowLogo(true);
     }
+
+    setIsOpen(true);
   };
 
   const handleCreateStream = async () => {
-    if (!newName.trim()) {
-      toast.error("Please enter a stream name");
-      return;
-    }
+    if (!newName.trim()) return;
 
-    if (selectedCampaigns.length === 0) {
-      toast.error("Please select at least one campaign");
-      return;
-    }
-
-    setLoading({ ...loading, createStream: true });
+    setLoading((s) => ({ ...s, createStream: true }));
     try {
       const formData = new FormData();
-      formData.append("name", newName.trim());
+      formData.append("name", newName);
       formData.append("campaignIds", JSON.stringify(selectedCampaigns));
+      formData.append("displayMode", displayMode);
+      formData.append("color", color);
+      formData.append("showLogo", showLogo.toString());
 
       if (logoFile) {
         formData.append("logo", logoFile);
@@ -132,34 +145,29 @@ const Streams = ({
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
-          setStreams((prevStreams) => [result.data, ...prevStreams]);
-          toast.success("Stream created successfully!");
+          setStreams((prev) => [result.data, ...prev]);
           setIsOpen(false);
           resetForm();
-          router.refresh();
         }
-      } else {
-        toast.error("Failed to create stream");
       }
     } catch (error) {
       console.error("Error creating stream:", error);
-      toast.error("Error creating stream");
     } finally {
-      setLoading({ ...loading, createStream: false });
+      setLoading((s) => ({ ...s, createStream: false }));
     }
   };
 
   const handleUpdateStream = async () => {
-    if (!editingStreamId || !newName.trim()) {
-      toast.error("Please enter a stream name");
-      return;
-    }
+    if (!editingStreamId || !newName.trim()) return;
 
-    setLoading({ ...loading, updateStream: true });
+    setLoading((s) => ({ ...s, updateStream: true }));
     try {
       const formData = new FormData();
-      formData.append("name", newName.trim());
+      formData.append("name", newName);
       formData.append("campaignIds", JSON.stringify(selectedCampaigns));
+      formData.append("displayMode", displayMode);
+      formData.append("color", color);
+      formData.append("showLogo", showLogo.toString());
 
       if (logoFile) {
         formData.append("logo", logoFile);
@@ -173,66 +181,46 @@ const Streams = ({
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
-          setStreams((prevStreams) =>
-            prevStreams.map((stream) =>
+          setStreams((prev) =>
+            prev.map((stream) =>
               stream.id === editingStreamId ? result.data : stream
             )
           );
-          toast.success("Stream updated successfully!");
           setIsOpen(false);
           resetForm();
-          router.refresh();
         }
-      } else {
-        toast.error("Failed to update stream");
       }
     } catch (error) {
       console.error("Error updating stream:", error);
-      toast.error("Error updating stream");
     } finally {
-      setLoading({ ...loading, updateStream: false });
+      setLoading((s) => ({ ...s, updateStream: false }));
     }
   };
 
   const handleDeleteStream = async (streamId: string) => {
-    if (!confirm("Are you sure you want to delete this stream?")) {
-      return;
-    }
-
+    if (!confirm("Delete this stream?")) return;
     try {
-      const response = await fetch(`/api/streams/${streamId}`, {
+      const resp = await fetch(`/api/streams/${streamId}`, {
         method: "DELETE",
       });
-
-      if (response.ok) {
-        const result = await response.json();
+      if (resp.ok) {
+        const result = await resp.json();
         if (result.success) {
-          setStreams((prevStreams) =>
-            prevStreams.filter((stream) => stream.id !== streamId)
-          );
-          toast.success("Stream deleted successfully!");
+          setStreams((prev) => prev.filter((s) => s.id !== streamId));
+          toast.success("Stream deleted");
           router.refresh();
         }
       } else {
         toast.error("Failed to delete stream");
       }
-    } catch (error) {
-      console.error("Error deleting stream:", error);
+    } catch (e) {
+      console.error(e);
       toast.error("Error deleting stream");
     }
   };
 
-  const toggleCampaign = (id: string) => {
-    setSelectedCampaigns((prev) =>
-      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
-    );
-  };
-
   const openConfigDialog = (stream: Stream) => {
     setSelectedStream(stream);
-    setDisplayMode("grid");
-    setSelectedColor("#3B82F6");
-    setShowLogo(true);
     setGeneratedScript("");
     setGeneratedUrl("");
     setGeneratedQR("");
@@ -241,75 +229,49 @@ const Streams = ({
 
   const BASE_URL = process.env.NEXT_PUBLIC_APP_URL as string;
 
-  const generateEmbedCode = (
-    stream: Stream,
-    mode: "grid" | "slideshow",
-    color: string,
-    includeLogo: boolean = true
-  ) => {
-    const logoUrl = includeLogo && stream.logoUrl ? stream.logoUrl : "";
+  const generateEmbedCode = (stream: Stream) => {
     const base = BASE_URL.replace(/\/$/, "");
     return `<div
-      style={{ height: "100%" }}
-      id="gallery-widget"
-      data-display-mode="${mode}"
-      data-stream-id="${stream.id}"
-      data-color="${color}"
-      data-logo="${logoUrl}"
-      data-base-url="${base}"
-    ></div>
-    <script src="${base}/widget.js" defer></script>`;
+  style={{ height: "100%" }}
+  id="gallery-widget"
+  data-stream-id="${stream.id}"
+  data-base-url="${base}"
+></div>
+<script src="${base}/widget.js" defer></script>`;
   };
 
   const handleGenerateScript = () => {
-    if (selectedStream) {
-      const code = generateEmbedCode(
-        selectedStream,
-        displayMode,
-        selectedColor,
-        showLogo
-      );
-      setGeneratedScript(code);
-      setGeneratedUrl("");
-      setGeneratedQR("");
-    }
+    if (!selectedStream) return;
+    setGeneratedScript(generateEmbedCode(selectedStream));
+    setGeneratedUrl("");
+    setGeneratedQR("");
   };
 
   const handleGeneratePublicUrl = () => {
-    if (selectedStream) {
-      const logoParam =
-        showLogo && selectedStream.logoUrl
-          ? `&logo=${encodeURIComponent(selectedStream.logoUrl)}`
-          : "";
-      const base = BASE_URL.replace(/\/$/, "");
-      const url = `${base}/widget?displayMode=${displayMode}&color=${encodeURIComponent(
-        selectedColor
-      )}&streamId=${selectedStream.id}${logoParam}`;
-      setGeneratedUrl(url);
-      setGeneratedScript("");
-      setGeneratedQR("");
-    }
+    if (!selectedStream) return;
+    const base = BASE_URL.replace(/\/$/, "");
+    const url = `${base}/widget?streamId=${selectedStream.id}`;
+    setGeneratedUrl(url);
+    setGeneratedScript("");
+    setGeneratedQR("");
   };
 
   const handleGenerateQR = () => {
-    if (selectedStream) {
-      const logoParam =
-        showLogo && selectedStream.logoUrl
-          ? `&logo=${encodeURIComponent(selectedStream.logoUrl)}`
-          : "";
-      const base = BASE_URL.replace(/\/$/, "");
-      const url = `${base}/widget?displayMode=${displayMode}&color=${encodeURIComponent(
-        selectedColor
-      )}&streamId=${selectedStream.id}${logoParam}`;
-      setGeneratedQR(url);
-      setGeneratedScript("");
-      setGeneratedUrl("");
-    }
+    if (!selectedStream) return;
+    const base = BASE_URL.replace(/\/$/, "");
+    const url = `${base}/widget?streamId=${selectedStream.id}`;
+    setGeneratedQR(url);
+    setGeneratedScript("");
+    setGeneratedUrl("");
   };
 
   const copyToClipboard = async (text: string) => {
-    await navigator.clipboard.writeText(text);
-    toast.success("Copied to clipboard!");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Copied to clipboard");
+    } catch (err) {
+      console.error("Failed to copy text: ", err);
+    }
   };
 
   if (loading.initial) {
@@ -329,35 +291,26 @@ const Streams = ({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Streams</h1>
-          <p className="text-muted-foreground">
-            Manage and configure your content streams
-          </p>
-        </div>
+      {/* Header - minimal */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight">Streams</h1>
         <Button onClick={openCreateDialog} className="gap-2">
           <Plus className="w-4 h-4" />
-          Create Stream
+          New Stream
         </Button>
       </div>
 
-      {/* Streams Grid */}
+      {/* Grid */}
       {streams.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <ImageIcon className="w-12 h-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">
-              No streams created yet
-            </h3>
-            <p className="text-muted-foreground text-center mb-4">
-              Create your first stream to start organizing and displaying your
-              content.
+          <CardContent className="flex flex-col items-center justify-center py-10">
+            <ImageIcon className="w-10 h-10 text-muted-foreground mb-3" />
+            <p className="text-sm text-muted-foreground mb-4">
+              No streams yet.
             </p>
             <Button onClick={openCreateDialog} className="gap-2">
               <Plus className="w-4 h-4" />
-              Create Your First Stream
+              Create Stream
             </Button>
           </CardContent>
         </Card>
@@ -367,7 +320,7 @@ const Streams = ({
             <StreamCard
               key={stream.id}
               stream={stream}
-              onEdit={handleEditStream}
+              onEdit={() => openEditDialog(stream)}
               onDelete={handleDeleteStream}
               onEmbed={openConfigDialog}
             />
@@ -375,38 +328,40 @@ const Streams = ({
         </div>
       )}
 
-      {/* Create/Edit Stream Dialog */}
+      {/* Create/Edit Dialog */}
       <CreateEditStreamDialog
         isOpen={isOpen}
         onClose={() => {
-          if (!isOpen) {
-            resetForm();
-          }
+          if (!isOpen) resetForm();
           setIsOpen(false);
         }}
         isEditMode={isEditMode}
         newName={newName}
         setNewName={setNewName}
         selectedCampaigns={selectedCampaigns}
-        toggleCampaign={toggleCampaign}
+        toggleCampaign={(id) =>
+          setSelectedCampaigns((prev) =>
+            prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
+          )
+        }
         campaigns={campaigns}
         logoFile={logoFile}
         setLogoFile={setLogoFile}
+        displayMode={displayMode}
+        setDisplayMode={setDisplayMode}
+        color={color}
+        setColor={setColor}
+        showLogo={showLogo}
+        setShowLogo={setShowLogo}
         onSubmit={isEditMode ? handleUpdateStream : handleCreateStream}
         loading={loading.createStream || loading.updateStream}
       />
 
-      {/* Embed Config Dialog */}
+      {/* Embed Dialog */}
       <EmbedConfigDialog
         isOpen={isConfigOpen}
         onClose={() => setIsConfigOpen(false)}
         selectedStream={selectedStream}
-        displayMode={displayMode}
-        setDisplayMode={setDisplayMode}
-        selectedColor={selectedColor}
-        setSelectedColor={setSelectedColor}
-        showLogo={showLogo}
-        setShowLogo={setShowLogo}
         generatedScript={generatedScript}
         generatedUrl={generatedUrl}
         generatedQR={generatedQR}

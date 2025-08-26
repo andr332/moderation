@@ -21,12 +21,15 @@ interface ImageType {
   source: "internal" | "external_app" | "manual";
 }
 
+interface StreamConfig {
+  displayMode: "grid" | "slideshow";
+  color: string;
+  showLogo: boolean;
+}
+
 function WidgetComponent() {
   const searchParams = useSearchParams();
-  const displayMode = searchParams.get("displayMode") || "slideshow";
   const streamId = searchParams.get("streamId");
-  const color = searchParams.get("color") || "#3B82F6";
-  const logo = searchParams.get("logo");
 
   const [images, setImages] = useState<ImageType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,10 +38,33 @@ function WidgetComponent() {
   const [isAutoPlay, setIsAutoPlay] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
+  const [streamConfig, setStreamConfig] = useState<StreamConfig>({
+    displayMode: "grid",
+    color: "#3B82F6",
+    showLogo: true,
+  });
+  const [streamLogo, setStreamLogo] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  const primaryColor = color;
-  const primaryColorLight = `${color}20`;
+  const primaryColor = streamConfig.color;
+  const primaryColorLight = `${streamConfig.color}20`;
+
+  const fetchStreamConfig = async () => {
+    if (!streamId) return;
+
+    try {
+      const response = await fetch(`/api/streams/${streamId}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setStreamConfig(result.data.widgetConfig);
+          setStreamLogo(result.data.logoUrl);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching stream config:", error);
+    }
+  };
 
   const fetchImages = async () => {
     try {
@@ -48,19 +74,26 @@ function WidgetComponent() {
         setLoading(false);
         return;
       }
+
+      console.log("Fetching images for stream:", streamId);
       const url = `/api/images?status=approved&streamId=${streamId}`;
       const response = await fetch(url);
+
       if (!response.ok) {
         if (response.status === 404) {
           throw new Error("Stream not found");
         }
         throw new Error("Failed to fetch images");
       }
+
       const result = await response.json();
+      console.log("Images API response:", result);
+
       if (result.success) {
         setImages(result.data);
         setLastUpdate(new Date());
-        setStreamError(null); // Clear any previous stream errors
+        setStreamError(null);
+        setError(null);
       } else {
         if (
           result.error?.includes("Stream not found") ||
@@ -73,6 +106,7 @@ function WidgetComponent() {
         }
       }
     } catch (err) {
+      console.error("Error fetching images:", err);
       if (err instanceof Error) {
         if (err.message === "Stream not found") {
           setStreamError("Invalid or missing stream ID");
@@ -88,36 +122,42 @@ function WidgetComponent() {
     }
   };
 
+  // Initial data fetch
   useEffect(() => {
-    if (!streamId) {
+    console.log("Initial useEffect - streamId:", streamId);
+    if (streamId) {
+      fetchStreamConfig();
       fetchImages();
-      return;
+    } else {
+      setStreamError("Stream ID is required to view this page.");
+      setLoading(false);
     }
+  }, [streamId]);
 
-    // Try SSE first, fallback to regular fetch
+  // Set up SSE connection for live updates (only after initial load)
+  useEffect(() => {
+    if (!streamId || loading) return;
+
+    console.log("Setting up SSE connection for stream:", streamId);
+
     const setupSSE = () => {
       try {
         const eventSource = new EventSource(
           `/api/widget/updates?streamId=${streamId}`
         );
-        eventSourceRef.current = eventSource;
-        // Add a timeout to fallback to regular fetch if SSE doesn't respond
-        const timeout = setTimeout(() => {
-          eventSource.close();
-          fetchImages();
-        }, 3000); // 3 second timeout
 
         eventSource.onopen = () => {
-          clearTimeout(timeout);
+          console.log("SSE connection established");
         };
 
         eventSource.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            if (data.type === "update" || data.type === "initial") {
+            console.log("SSE message received:", data);
+            if (data.type === "initial" || data.type === "update") {
               setImages(data.images);
               setLastUpdate(new Date());
-              setLoading(false);
+              setError(null);
             }
           } catch (error) {
             console.error("Error parsing SSE data:", error);
@@ -125,35 +165,51 @@ function WidgetComponent() {
         };
 
         eventSource.onerror = (error) => {
-          console.error("SSE error:", error);
-          clearTimeout(timeout);
+          console.error("SSE connection error:", error);
           eventSource.close();
-          fetchImages();
+          // Fallback to regular polling if SSE fails
+          setTimeout(() => {
+            fetchImages();
+          }, 5000);
         };
 
+        eventSourceRef.current = eventSource;
+
         return () => {
-          clearTimeout(timeout);
           eventSource.close();
         };
       } catch (error) {
         console.error("Error setting up SSE:", error);
-        fetchImages();
+        // Fallback to regular polling
+        setTimeout(() => {
+          fetchImages();
+        }, 5000);
       }
     };
 
     const cleanup = setupSSE();
-    return cleanup;
-  }, [streamId]);
+
+    return () => {
+      if (cleanup) cleanup();
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, [streamId, loading]);
 
   // Auto-play functionality for slideshow
   useEffect(() => {
-    if (displayMode === "slideshow" && isAutoPlay && images.length > 0) {
+    if (
+      streamConfig.displayMode === "slideshow" &&
+      isAutoPlay &&
+      images.length > 0
+    ) {
       const interval = setInterval(() => {
         setCurrentSlide((prev) => (prev + 1) % images.length);
       }, 4000);
       return () => clearInterval(interval);
     }
-  }, [isAutoPlay, images.length, displayMode]);
+  }, [isAutoPlay, images.length, streamConfig.displayMode]);
 
   // Reset current slide when images change
   useEffect(() => {
@@ -171,6 +227,15 @@ function WidgetComponent() {
   const goToSlide = (index: number) => {
     setCurrentSlide(index);
   };
+
+  console.log("Widget render state:", {
+    loading,
+    error,
+    streamError,
+    imagesCount: images.length,
+    streamId,
+    streamConfig,
+  });
 
   if (loading) {
     return (
@@ -229,7 +294,7 @@ function WidgetComponent() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
         <div className="text-center space-y-4 p-8 bg-white rounded-2xl shadow-lg max-w-md mx-4">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
             <span className="text-red-500 text-2xl">⚠</span>
@@ -282,9 +347,9 @@ function WidgetComponent() {
         <div className="max-w-[1460px] mx-auto">
           <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {logo && (
+              {streamConfig.showLogo && streamLogo && (
                 <Image
-                  src={logo}
+                  src={streamLogo}
                   alt="Stream Logo"
                   width={40}
                   height={40}
@@ -296,7 +361,7 @@ function WidgetComponent() {
                   Gallery Widget
                 </h1>
                 <p className="text-sm text-slate-600">
-                  {images.length} images • {displayMode} view
+                  {images.length} images • {streamConfig.displayMode} view
                   {streamId &&
                     images[0]?.streamName &&
                     ` • ${images[0].streamName}`}
@@ -310,7 +375,7 @@ function WidgetComponent() {
             </div>
 
             <div className="flex items-center gap-3">
-              {displayMode === "slideshow" && (
+              {streamConfig.displayMode === "slideshow" && (
                 <Button
                   onClick={() => setIsAutoPlay(!isAutoPlay)}
                   variant="outline"
@@ -336,11 +401,10 @@ function WidgetComponent() {
           </div>
         </div>
       </div>
-
       {/* Rest of the component remains the same */}
       <div className="max-w-[1460px] mx-auto">
         <div className="max-w-7xl mx-auto px-4 py-8">
-          {displayMode === "grid" ? (
+          {streamConfig.displayMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
               {images.map((image, index) => (
                 <div

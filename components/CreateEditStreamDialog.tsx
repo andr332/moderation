@@ -17,6 +17,14 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { RefreshCw } from "lucide-react";
 import { Campaign } from "@/lib/types";
 
@@ -31,6 +39,12 @@ interface CreateEditStreamDialogProps {
   campaigns: Campaign[];
   logoFile: File | null;
   setLogoFile: (file: File | null) => void;
+  displayMode: "grid" | "slideshow";
+  setDisplayMode: (mode: "grid" | "slideshow") => void;
+  color: string;
+  setColor: (color: string) => void;
+  showLogo: boolean;
+  setShowLogo: (show: boolean) => void;
   onSubmit: () => void;
   loading: boolean;
 }
@@ -45,6 +59,12 @@ const CreateEditStreamDialog = ({
   toggleCampaign,
   campaigns,
   setLogoFile,
+  displayMode,
+  setDisplayMode,
+  color,
+  setColor,
+  showLogo,
+  setShowLogo,
   onSubmit,
   loading,
 }: CreateEditStreamDialogProps) => {
@@ -57,7 +77,7 @@ const CreateEditStreamDialog = ({
           </DialogTitle>
           <DialogDescription>
             {isEditMode
-              ? "Update stream settings, campaigns, and logo."
+              ? "Update stream settings, campaigns, and widget configuration."
               : "Create a new stream to organize and display your content."}
           </DialogDescription>
         </DialogHeader>
@@ -110,6 +130,61 @@ const CreateEditStreamDialog = ({
                 }
               }}
             />
+          </div>
+
+          {/* Widget Configuration Section */}
+          <div className="space-y-4 pt-4 border-t">
+            <h3 className="text-sm font-medium">Widget Configuration</h3>
+
+            <div className="space-y-2">
+              <Label htmlFor="display-mode">Display Mode</Label>
+              <Select
+                value={displayMode}
+                onValueChange={(value: "grid" | "slideshow") =>
+                  setDisplayMode(value)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select display mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="grid">Grid</SelectItem>
+                  <SelectItem value="slideshow">Slideshow</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="color">Primary Color</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="color"
+                  type="color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="w-16 h-10 p-1"
+                />
+                <Input
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  placeholder="#3B82F6"
+                  className="flex-1"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="show-logo"
+                  checked={showLogo}
+                  onCheckedChange={(checked) => setShowLogo(checked as boolean)}
+                />
+                <Label htmlFor="show-logo" className="text-sm font-normal">
+                  Show logo in widget header
+                </Label>
+              </div>
+            </div>
           </div>
 
           <Button onClick={onSubmit} className="w-full" disabled={loading}>

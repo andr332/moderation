@@ -4,6 +4,25 @@ import { dbConnect } from "@/lib/db";
 import { Stream } from "@/models";
 import { deleteFileFromGridFS } from "@/lib/gridfs";
 
+// Helper function to add CORS headers
+function addCorsHeaders(response: NextResponse) {
+  response.headers.set("Access-Control-Allow-Origin", "*");
+  response.headers.set(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS"
+  );
+  response.headers.set(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization"
+  );
+  return response;
+}
+
+// Handle OPTIONS requests for CORS preflight
+export async function OPTIONS() {
+  return addCorsHeaders(new NextResponse(null, { status: 200 }));
+}
+
 export async function GET(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -18,36 +37,40 @@ export async function GET(
     );
 
     if (!stream) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { success: false, error: "Stream not found" },
         { status: 404 }
       );
+      return addCorsHeaders(response);
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       data: {
         id: stream._id.toString(),
         name: stream.name,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         campaigns: stream.campaignIds.map((campaign: any) => ({
           id: campaign._id.toString(),
           name: campaign.name,
           description: campaign.description,
         })),
         logoUrl: stream.logoFileId
-          ? `/api/files/${stream.logoFileId}`
+          ? `${process.env.NEXT_PUBLIC_APP_URL}/api/files/${stream.logoFileId}`
           : stream.logoUrl,
+        widgetConfig: stream.widgetConfig,
         createdAt: stream.createdAt.toISOString(),
         updatedAt: stream.updatedAt.toISOString(),
       },
     });
+
+    return addCorsHeaders(response);
   } catch (error) {
     console.error("Error fetching stream:", error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { success: false, error: "Failed to fetch stream" },
       { status: 500 }
     );
+    return addCorsHeaders(response);
   }
 }
 
@@ -59,6 +82,9 @@ export async function POST(req: NextRequest) {
     const name = formData.get("name") as string;
     const campaignIds = formData.get("campaignIds") as string;
     const logoFile = formData.get("logo") as File;
+    const displayMode = formData.get("displayMode") as string;
+    const color = formData.get("color") as string;
+    const showLogo = formData.get("showLogo") as string;
 
     if (!name) {
       return NextResponse.json(
@@ -95,10 +121,18 @@ export async function POST(req: NextRequest) {
     // Parse campaign IDs
     const parsedCampaignIds = campaignIds ? JSON.parse(campaignIds) : [];
 
+    // Parse widget config
+    const widgetConfig = {
+      displayMode: displayMode === "slideshow" ? "slideshow" : "grid",
+      color: color || "#3B82F6",
+      showLogo: showLogo === "true",
+    };
+
     const stream = await Stream.create({
       name,
       campaignIds: parsedCampaignIds,
       logoFileId,
+      widgetConfig,
     });
 
     // Populate the campaign data for the response
@@ -116,8 +150,9 @@ export async function POST(req: NextRequest) {
         description: campaign.description,
       })),
       logoUrl: populatedStream.logoFileId
-        ? `/api/files/${populatedStream.logoFileId}`
+        ? `${process.env.NEXT_PUBLIC_APP_URL}/api/files/${populatedStream.logoFileId}`
         : undefined,
+      widgetConfig: populatedStream.widgetConfig,
       createdAt: populatedStream.createdAt.toISOString(),
       updatedAt: populatedStream.updatedAt.toISOString(),
     };
@@ -150,13 +185,36 @@ export async function PUT(
     const name = formData.get("name") as string;
     const campaignIds = formData.get("campaignIds") as string;
     const logoFile = formData.get("logo") as File;
+    const displayMode = formData.get("displayMode") as string;
+    const color = formData.get("color") as string;
+    const showLogo = formData.get("showLogo") as string;
 
-    let logoFileId = undefined;
+    if (!name) {
+      return NextResponse.json(
+        { success: false, error: "name is required" },
+        { status: 400 }
+      );
+    }
+
+    const stream = await Stream.findById(id);
+    if (!stream) {
+      return NextResponse.json(
+        { success: false, error: "Stream not found" },
+        { status: 404 }
+      );
+    }
+
+    let logoFileId = stream.logoFileId;
 
     // Handle logo upload
     if (logoFile) {
       try {
-        // Upload the file to GridFS
+        // Delete old logo if exists
+        if (stream.logoFileId) {
+          await deleteFileFromGridFS(stream.logoFileId);
+        }
+
+        // Upload the new file to GridFS
         const uploadFormData = new FormData();
         uploadFormData.append("file", logoFile);
 
@@ -179,22 +237,24 @@ export async function PUT(
     // Parse campaign IDs
     const parsedCampaignIds = campaignIds ? JSON.parse(campaignIds) : [];
 
+    // Parse widget config
+    const widgetConfig = {
+      displayMode: displayMode === "slideshow" ? "slideshow" : "grid",
+      color: color || "#3B82F6",
+      showLogo: showLogo === "true",
+    };
+
     const updatedStream = await Stream.findByIdAndUpdate(
       id,
       {
         name,
         campaignIds: parsedCampaignIds,
-        ...(logoFileId && { logoFileId }),
+        logoFileId,
+        widgetConfig,
+        updatedAt: new Date(),
       },
       { new: true }
     ).populate("campaignIds", "name description");
-
-    if (!updatedStream) {
-      return NextResponse.json(
-        { success: false, error: "Stream not found" },
-        { status: 404 }
-      );
-    }
 
     const streamData = {
       id: updatedStream._id.toString(),
@@ -205,8 +265,9 @@ export async function PUT(
         description: campaign.description,
       })),
       logoUrl: updatedStream.logoFileId
-        ? `/api/files/${updatedStream.logoFileId}`
+        ? `${process.env.NEXT_PUBLIC_APP_URL}/api/files/${updatedStream.logoFileId}`
         : undefined,
+      widgetConfig: updatedStream.widgetConfig,
       createdAt: updatedStream.createdAt.toISOString(),
       updatedAt: updatedStream.updatedAt.toISOString(),
     };
@@ -233,7 +294,6 @@ export async function DELETE(
     const { id } = await context.params;
 
     const stream = await Stream.findById(id);
-
     if (!stream) {
       return NextResponse.json(
         { success: false, error: "Stream not found" },
@@ -241,7 +301,7 @@ export async function DELETE(
       );
     }
 
-    // Delete logo file from GridFS if it exists
+    // Delete logo file if exists
     if (stream.logoFileId) {
       await deleteFileFromGridFS(stream.logoFileId);
     }
