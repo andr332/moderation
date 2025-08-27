@@ -13,7 +13,6 @@ export async function GET(req: NextRequest) {
     const streamId = searchParams.get("streamId");
     const assignment = searchParams.get("assignment");
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {};
 
     if (status) query.status = status;

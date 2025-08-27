@@ -17,7 +17,6 @@ import {
 import Image from "next/image";
 import {
   FolderOpen,
-  Shield,
   CheckCircle,
   XCircle,
   Image as ImageIcon,

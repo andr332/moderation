@@ -74,8 +74,6 @@ function WidgetComponent() {
         setLoading(false);
         return;
       }
-
-      console.log("Fetching images for stream:", streamId);
       const url = `/api/images?status=approved&streamId=${streamId}`;
       const response = await fetch(url);
 
@@ -87,7 +85,6 @@ function WidgetComponent() {
       }
 
       const result = await response.json();
-      console.log("Images API response:", result);
 
       if (result.success) {
         setImages(result.data);
@@ -124,7 +121,6 @@ function WidgetComponent() {
 
   // Initial data fetch
   useEffect(() => {
-    console.log("Initial useEffect - streamId:", streamId);
     if (streamId) {
       fetchStreamConfig();
       fetchImages();
@@ -138,22 +134,15 @@ function WidgetComponent() {
   useEffect(() => {
     if (!streamId || loading) return;
 
-    console.log("Setting up SSE connection for stream:", streamId);
-
     const setupSSE = () => {
       try {
         const eventSource = new EventSource(
           `/api/widget/updates?streamId=${streamId}`
         );
 
-        eventSource.onopen = () => {
-          console.log("SSE connection established");
-        };
-
         eventSource.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            console.log("SSE message received:", data);
             if (data.type === "initial" || data.type === "update") {
               setImages(data.images);
               setLastUpdate(new Date());
@@ -227,15 +216,6 @@ function WidgetComponent() {
   const goToSlide = (index: number) => {
     setCurrentSlide(index);
   };
-
-  console.log("Widget render state:", {
-    loading,
-    error,
-    streamError,
-    imagesCount: images.length,
-    streamId,
-    streamConfig,
-  });
 
   if (loading) {
     return (

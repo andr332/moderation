@@ -17,7 +17,6 @@ export async function GET() {
         id: campaign._id.toString(),
         name: campaign.name,
         description: campaign.description,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         images: campaign.imageIds.map((image: any) => ({
           id: image._id.toString(),
           img: image.img,

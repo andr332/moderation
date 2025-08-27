@@ -268,7 +268,7 @@ export default function ModerationQueue({
                 {data.length > 0 ? (
                   data.map((item) => (
                     <TableRow
-                      onClick={(e) => {
+                      onClick={() => {
                         setPreviewItem(item);
                         setPreviewOpen(true);
                       }}

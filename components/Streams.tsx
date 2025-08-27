@@ -96,9 +96,6 @@ const Streams = ({
   };
 
   const openEditDialog = (stream: Stream) => {
-    console.log("Opening edit dialog for stream:", stream);
-    console.log("Stream widgetConfig:", stream.widgetConfig);
-
     setIsEditMode(true);
     setEditingStreamId(stream.id);
     setNewName(stream.name);
@@ -107,12 +104,10 @@ const Streams = ({
 
     // Set widget configuration from stream
     if (stream.widgetConfig) {
-      console.log("Setting widget config:", stream.widgetConfig);
       setDisplayMode(stream.widgetConfig.displayMode);
       setColor(stream.widgetConfig.color);
       setShowLogo(stream.widgetConfig.showLogo);
     } else {
-      console.log("No widget config found, using defaults");
       setDisplayMode("grid");
       setColor("#3B82F6");
       setShowLogo(true);
@@ -231,13 +226,14 @@ const Streams = ({
 
   const generateEmbedCode = (stream: Stream) => {
     const base = BASE_URL.replace(/\/$/, "");
-    return `<div
-  style={{ height: "100%" }}
-  id="gallery-widget"
-  data-stream-id="${stream.id}"
-  data-base-url="${base}"
-></div>
-<script src="${base}/widget.js" defer></script>`;
+    return `<iframe
+        src="${base}/widget?streamId=${stream.id}&embed=1"
+        style={{
+          width: "100%",
+          height: "100%",
+        }}
+        loading="lazy"
+      ></iframe>`;
   };
 
   const handleGenerateScript = () => {
